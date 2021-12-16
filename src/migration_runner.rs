@@ -24,6 +24,7 @@ pub struct ExecutedMigration {
 pub struct MigrationStep {
     pub prev_id: Option<usize>,
     pub id: usize,
+    pub label: Option<String>,
     pub sql: String,
 }
 
@@ -114,10 +115,14 @@ impl MigrationRunner {
         let steps = if is_upgrade {
             to_run
                 .into_iter()
-                .map(|id| MigrationStep {
-                    prev_id: if id == 1 { None } else { Some(id - 1) },
-                    id: id,
-                    sql: state_by_id.get(&id).unwrap().upgrade_text.clone(),
+                .map(|id| {
+                    let step = state_by_id.get(&id).unwrap();
+                    MigrationStep {
+                        prev_id: if id == 1 { None } else { Some(id - 1) },
+                        id: id,
+                        label: step.label.clone(),
+                        sql: step.upgrade_text.clone(),
+                    }
                 })
                 .collect::<Vec<_>>()
         } else {
@@ -130,6 +135,7 @@ impl MigrationRunner {
                         Ok(MigrationStep {
                             prev_id: if id == highest_id { None } else { Some(id + 1) },
                             id,
+                            label: step.label.clone(),
                             sql: sql.clone(),
                         })
                     } else {
@@ -153,9 +159,10 @@ impl MigrationRunner {
             == 0
         {
             debug!("creating rmmm_migrations table");
-            tx.query_drop("CREATE TABLE rmmm_migrations(id INT NOT NULL PRIMARY KEY, executed_at BIGINT NOT NULL)")?;
+            tx.query_drop("CREATE TABLE rmmm_migrations(id INT NOT NULL PRIMARY KEY, label VARCHAR(255) NOT NULL, executed_at BIGINT NOT NULL)")?;
         }
-        let insert_stmt = tx.prep("INSERT INTO rmmm_migrations(id, executed_at) VALUES(?, ?)")?;
+        let insert_stmt =
+            tx.prep("INSERT INTO rmmm_migrations(id, label, executed_at) VALUES(?, ?, ?)")?;
         let delete_stmt = tx.prep("DELETE FROM rmmm_migrations WHERE id = ?")?;
         for step in plan.steps {
             for command in step.sql.split(";\n") {
@@ -167,7 +174,7 @@ impl MigrationRunner {
                 tx.query_drop(command)?;
             }
             if plan.is_upgrade {
-                tx.exec_drop(&insert_stmt, (step.id, self.now()))?;
+                tx.exec_drop(&insert_stmt, (step.id, step.label, self.now()))?;
             } else {
                 tx.exec_drop(&delete_stmt, (step.id,))?;
             }
@@ -215,11 +222,12 @@ impl MigrationRunner {
         if tables.contains(&"rmmm_migrations".to_owned()) {
             lines.extend(vec!["".to_string()]);
             lines.extend(tx.query_map(
-                "SELECT id FROM rmmm_migrations ORDER BY id ASC",
-                |id: u64| {
+                "SELECT id, label FROM rmmm_migrations ORDER BY id ASC",
+                |(id, label): (u64, String)| {
                     format!(
-                        "INSERT INTO rmmm_migrations(id, executed_at) VALUES({}, NOW());",
-                        id
+                        "INSERT INTO rmmm_migrations(id, label, executed_at) VALUES({}, '{}', NOW());",
+                        id,
+                        label,
                     )
                 },
             )?);
