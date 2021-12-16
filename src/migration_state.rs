@@ -108,12 +108,15 @@ impl MigrationState {
 
     pub fn generate(&self, label: &str) -> anyhow::Result<()> {
         let migrations_path = self.root_path.join("migrations");
+        std::fs::create_dir_all(&migrations_path)?;
         let next_file = format!("v{0}.sql", self.next_id);
-        let f = tempfile::NamedTempFile::new()?;
+        let f = tempfile::Builder::new()
+            .suffix(".sql")
+            .tempfile_in(&migrations_path)?;
         {
             let mut f = f.as_file();
             writeln!(f, "/* rmmm migration v{0} - {1} */", self.next_id, label)?;
-            writeln!(f, "\n\n-- Delete this comment and put your migration here")?;
+            writeln!(f, "\n-- Delete this comment and put your migration here. Blank lines and comments are ignored.")?;
             writeln!(
                 f,
                 "-- Create {0}/v{1}_downgrade.sql to make this migraiton reversible",
