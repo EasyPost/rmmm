@@ -7,6 +7,8 @@ use anyhow::Context;
 use itertools::Itertools;
 use log::debug;
 
+const DEFAULT_EDITOR: &str = "nano";
+
 #[derive(Debug)]
 pub(crate) struct Migration {
     pub id: usize,
@@ -38,16 +40,11 @@ impl Migration {
             static ref LABEL_RE: regex::Regex =
                 regex::Regex::new(r"^/\* rmmm migration v[0-9]+ - (.*) \*/$").unwrap();
         }
-        let label = if let Some(first_line) = upgrade_file.lines().next() {
-            debug!("got line {:?}", first_line);
-            if let Some(captures) = LABEL_RE.captures(first_line) {
-                Some(captures.get(1).unwrap().as_str())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let label = upgrade_file
+            .lines()
+            .next()
+            .and_then(|first_line| LABEL_RE.captures(first_line))
+            .map(|c| c.get(1).unwrap().as_str());
         let upgrade_text = Migration::read_sql_from_path(p)?;
         let downgrade_p = p.with_file_name(format!("v{0}_downgrade.sql", id));
         let downgrade_text = if downgrade_p.exists() {
@@ -125,11 +122,13 @@ impl MigrationState {
             )?;
             f.sync_all()?;
         }
-        let editor = env::var("EDITOR").unwrap_or("nano".to_string());
+        let editor = env::var("EDITOR").unwrap_or_else(|_| DEFAULT_EDITOR.to_string());
         let status = std::process::Command::new(editor)
             .arg(f.path())
             .status()
-            .expect("Could not invoke editor on migration");
+            .expect(
+                "Could not invoke editor on migration; try setting $EDITOR to something useful",
+            );
         if status.success() {
             f.persist_noclobber(migrations_path.join(next_file))?;
         } else {
@@ -154,5 +153,33 @@ impl MigrationState {
         let schema_file = self.root_path.join("structure.sql");
         std::fs::write(schema_file, schema)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MigrationState;
+
+    #[test]
+    fn test_basic_flow() {
+        let wd = tempfile::TempDir::new().unwrap();
+        let uut = MigrationState::load(wd.path()).expect("Should load empty dir");
+        assert_eq!(uut.all_ids().len(), 0);
+        assert_eq!(uut.highest_id(), 0);
+        assert_eq!(uut.migrations_by_id().len(), 0);
+    }
+
+    #[test]
+    fn test_exists() {
+        let wd = tempfile::TempDir::new().unwrap();
+        let v1 = "CREATE TABLE test(id INT PRIMARY KEY, value BLOB)";
+        let v2 = "ALTER TABLE test ADD INDEX `idx_test_on_value` (`value`)";
+        std::fs::create_dir_all(wd.path().join("migrations")).unwrap();
+        std::fs::write(wd.path().join("migrations").join("v1.sql"), v1).unwrap();
+        std::fs::write(wd.path().join("migrations").join("v2.sql"), v2).unwrap();
+        let uut = MigrationState::load(wd.path()).expect("Should load full dir");
+        assert_eq!(uut.all_ids().len(), 2);
+        assert_eq!(uut.highest_id(), 2);
+        assert_eq!(uut.migrations_by_id().len(), 2);
     }
 }

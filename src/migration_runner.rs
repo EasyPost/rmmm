@@ -92,10 +92,8 @@ impl MigrationRunner {
             .collect::<BTreeSet<usize>>();
         let is_upgrade = if let Some(highest_run_id) = run_ids.iter().max() {
             *highest_run_id <= target_revision
-        } else if target_revision == 0 {
-            false
         } else {
-            true
+            target_revision != 0
         };
         let state_by_id = state.migrations_by_id();
         let to_run = if is_upgrade {
@@ -119,7 +117,7 @@ impl MigrationRunner {
                     let step = state_by_id.get(&id).unwrap();
                     MigrationStep {
                         prev_id: if id == 1 { None } else { Some(id - 1) },
-                        id: id,
+                        id,
                         label: step.label.clone(),
                         sql: step.upgrade_text.clone(),
                     }
