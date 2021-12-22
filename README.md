@@ -1,5 +1,7 @@
 This is a small Rust application for managing database migrations for MySQL.
 
+![CI](https://github.com/EasyPost/rmmm/workflows/CI/badge.svg?branch=master)
+
 It compiles into a single binary called `rmmm`.
 
 Configuration, by default, is through the `db/` directory of the directory in which `rmmm` is invoked. Migrations will
