@@ -3,12 +3,13 @@ This is a small Rust application for managing database migrations for MySQL.
 It compiles into a single binary called `rmmm`.
 
 Configuration, by default, is through the `db/` directory of the directory in which `rmmm` is invoked. Migrations will
-live in `db/migrations/*.sql` and structure will be dumped to `db/structure.sql`.
+live in `db/migrations/v{version}.sql`, rollbacks in `db/migrations/v{version}_downgrade.sql`,
+and structure will be dumped to `db/structure.sql`.
 
 Basic usage:
 
  1. `cargo install rmmm`
- 1. `rmmm generate foo` will pop up an editor for you to generate a migration
+ 1. `rmmm generate foo` will pop up an editor for you to write a migration. Migrations may be any number of SQL statements on lines by themselves ending with the `;` character. Comments are stripped.
  1. `rmmm status` will show all pending migrations
  1. `rmmm upgrade latest` will apply pending migrations. You can also upgrade (or downgrade) to a specific version.
 
