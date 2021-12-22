@@ -50,8 +50,7 @@ jobs:
         toolchain: stable
         components: rustfmt
         default: true
-    - name: cargo audit
-      uses: actions-rs/audit-check@v1.2.0
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-
+    - name: Install cargo audit
+      run: cargo install cargo-audit
+    - name: Cargo audit
+      run: cargo audit --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2020-0071
