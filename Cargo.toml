@@ -1,6 +1,6 @@
 [package]
 name = "rmmm"
-version = "0.1.0"
+version = "0.2.0"
 description = "Rust MySQL Migration Manager"
 repository = "https://github.com/EasyPost/rmmm"
 authors = ["James Brown <jbrown@easypost.com>"]
@@ -11,13 +11,22 @@ license = "ISC"
 [dependencies]
 anyhow = "1"
 chrono = "0.4"
-clap = "2"
+clap = { version = "3", features=["std", "color", "suggestions", "cargo", "env", "wrap_help"] }
 derive_more = "0.99"
 fern = {version = "0.6", features=["colored"]}
 itertools = "0.10"
 lazy_static = "1"
 log = "0.4"
-mysql = "21"
+mysql = { version = "22", default_features = false }
+# don't pin these; they're pinned by `mysql` and are just here to set features
+flate2 = { version = "*", default_features = false, features = ["zlib"] }
+mysql_common = { version = "*", default_features = false, features = ["time03"]}
 regex = "1"
-tabled = "0.3"
+tabled = "0.4"
 tempfile = "3"
+
+[features]
+default = ["uuid"]
+native-tls = ["mysql/native-tls"]
+rustls-tls = ["mysql/rustls-tls"]
+uuid = ["mysql_common/uuid"]

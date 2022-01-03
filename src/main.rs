@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 
 use anyhow::Context;
-use clap::{Arg, SubCommand};
+use clap::Arg;
 use derive_more::Display;
 use itertools::Itertools;
 use log::{debug, error, info};
@@ -101,7 +101,7 @@ fn command_status(state: MigrationState) -> anyhow::Result<()> {
             }
         })
         .collect::<Vec<_>>();
-    let table = tabled::Table::new(&data).with(tabled::Style::pseudo_clean());
+    let table = tabled::Table::new(&data).with(tabled::Style::PSEUDO_CLEAN);
     println!("{}", table);
     Ok(())
 }
@@ -144,7 +144,7 @@ fn command_upgrade(matches: &clap::ArgMatches, state: MigrationState) -> anyhow:
         })
         .collect::<Vec<_>>();
     let table = tabled::Table::new(&plan_data)
-        .with(tabled::Style::pseudo_clean())
+        .with(tabled::Style::PSEUDO_CLEAN)
         .with(tabled::Modify::new(tabled::Column(2..=2)).with(tabled::Alignment::left()));
     println!("Migration plan:");
     println!("{}", table);
@@ -180,14 +180,13 @@ fn command_reset(matches: &clap::ArgMatches) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let matches = clap::App::new(env!("CARGO_PKG_NAME"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .author(env!("CARGO_PKG_AUTHORS"))
-        .about(env!("CARGO_PKG_DESCRIPTION"))
-        .global_settings(&[clap::AppSettings::ColorAuto, clap::AppSettings::ColoredHelp])
+    let matches = clap::App::new(clap::crate_name!())
+        .version(clap::crate_version!())
+        .author(clap::crate_authors!())
+        .about(clap::crate_description!())
         .arg(
-            Arg::with_name("migration_path")
-                .short("p")
+            Arg::new("migration_path")
+                .short('p')
                 .long("migration-path")
                 .takes_value(true)
                 .default_value("db")
@@ -195,64 +194,64 @@ fn main() -> anyhow::Result<()> {
                 .help("Directory in which state is stored"),
         )
         .arg(
-            Arg::with_name("quiet")
-                .short("q")
+            Arg::new("quiet")
+                .short('q')
                 .long("quiet")
                 .help("Be less noisy when logging"),
         )
         .arg(
-            Arg::with_name("verbose")
-                .short("v")
+            Arg::new("verbose")
+                .short('v')
                 .long("verbose")
-                .multiple(true)
+                .multiple_occurrences(true)
                 .help("Be more noisy when logging"),
         )
-        .subcommand(SubCommand::with_name("status").about("Show the current status of migrations"))
+        .subcommand(clap::App::new("status").about("Show the current status of migrations"))
         .subcommand(
-            SubCommand::with_name("generate")
+            clap::App::new("generate")
                 .about("Generate a new migration")
                 .arg(
-                    Arg::with_name("label")
+                    Arg::new("label")
                         .required(true)
                         .help("Descriptive one-line label for the migration"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("upgrade")
+            clap::App::new("upgrade")
                 .about("Upgrade to the given revision")
                 .arg(
-                    Arg::with_name("revision")
+                    Arg::new("revision")
                         .required(true)
                         .help("Revision to which to upgrade (or 'latest')"),
                 )
                 .arg(
-                    Arg::with_name("execute")
-                        .short("x")
+                    Arg::new("execute")
+                        .short('x')
                         .long("execute")
                         .help("Actually upgrade (otherwise will just print what will be done"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("downgrade")
+            clap::App::new("downgrade")
                 .about("Downgrade to the given revision")
                 .arg(
-                    Arg::with_name("revision")
+                    Arg::new("revision")
                         .required(true)
                         .help("Revision to which to downgrade"),
                 )
                 .arg(
-                    Arg::with_name("execute")
-                        .short("x")
+                    Arg::new("execute")
+                        .short('x')
                         .long("execute")
                         .help("Actually upgrade (otherwise will just print what will be done"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("reset")
+            clap::App::new("reset")
                 .about("Drop all tables and totally reset the database (DANGEROUS)")
                 .arg(
-                    Arg::with_name("execute")
-                        .short("x")
+                    Arg::new("execute")
+                        .short('x')
                         .long("execute")
                         .help("Actually reset"),
                 ),
@@ -264,20 +263,20 @@ fn main() -> anyhow::Result<()> {
     let current_state = MigrationState::load(matches.value_of("migration_path").unwrap())?;
 
     match matches.subcommand() {
-        ("generate", Some(smatches)) => {
+        Some(("generate", smatches)) => {
             current_state.generate(smatches.value_of("label").unwrap())?
         }
-        ("status", _) => {
+        Some(("status", _)) => {
             command_status(current_state)?;
         }
-        ("upgrade", Some(smatches)) => {
+        Some(("upgrade", smatches)) => {
             command_upgrade(smatches, current_state)?;
         }
-        ("downgrade", Some(smatches)) => {
+        Some(("downgrade", smatches)) => {
             command_upgrade(smatches, current_state)?;
         }
-        ("reset", Some(smatches)) => command_reset(smatches)?,
-        (_, _) => {
+        Some(("reset", smatches)) => command_reset(smatches)?,
+        _ => {
             anyhow::bail!("Must pass a command!");
         }
     };

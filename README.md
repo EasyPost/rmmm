@@ -15,6 +15,8 @@ Basic usage:
  1. `rmmm status` will show all pending migrations
  1. `rmmm upgrade latest` will apply pending migrations. You can also upgrade (or downgrade) to a specific version.
 
+Modifying actions will only print out what they would do by default and must be run with `--execute` to make changes.
+
 Versions are just incrementing integers for simplicity.
 
 Configuration is typically through environment variables:
@@ -25,6 +27,17 @@ Configuration is typically through environment variables:
 | `$MIGRATION_PATH` | Path to store state (defaults to `./db`) |
 
 This work is licensed under the ISC license, a copy of which can be found in [LICENSE.txt](LICENSE.txt).
+
+Features
+--------
+RMMM supports the following feature flags:
+
+| Name | Meaning | Enabled by default |
+| `uuid` | Add support for native MySQL UUID types | ✓ |
+| `native-tls` | Use [native-tls](https://crates.io/crates/native-tls) to get SSL support via the local library (OpenSSL, etc) | |
+| `rustls-tls` | Use [rustls](https://crates.io/crates/rustls) to get SSL support | |
+
+You can enable exactly zero or one of `native-tls` or `rustls-tls`.
 
 Why?
 ----
