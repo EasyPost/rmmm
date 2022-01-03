@@ -17,7 +17,7 @@ Basic usage:
 
 Modifying actions will only print out what they would do by default and must be run with `--execute` to make changes.
 
-Versions are just incrementing integers for simplicity.
+Schema versions are just incrementing integers for simplicity.
 
 Configuration is typically through environment variables:
 
