@@ -35,6 +35,7 @@ Features
 RMMM supports the following feature flags:
 
 | Name | Meaning | Enabled by default |
+|------|---------|--------------------|
 | `uuid` | Add support for native MySQL UUID types | ✓ |
 | `native-tls` | Use [native-tls](https://crates.io/crates/native-tls) to get SSL support via the local library (OpenSSL, etc) | |
 | `rustls-tls` | Use [rustls](https://crates.io/crates/rustls) to get SSL support | |
