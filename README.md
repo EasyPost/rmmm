@@ -1,6 +1,6 @@
 This is a small Rust application for managing database migrations for MySQL.
 
-![CI](https://github.com/EasyPost/rmmm/workflows/CI/badge.svg?branch=master)
+[![CI](https://github.com/EasyPost/rmmm/workflows/CI/badge.svg?branch=master)](https://github.com/EasyPost/rmmm/actions/workflows/ci.yml)
 
 It compiles into a single binary called `rmmm`.
 

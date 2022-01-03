@@ -7,6 +7,8 @@ authors = ["James Brown <jbrown@easypost.com>"]
 readme = "README.md"
 edition = "2021"
 license = "ISC"
+keywords = ["database", "mysql", "schema"]
+categories = ["command-line-utilities", "database", "development-tools"]
 
 [dependencies]
 anyhow = "1"
