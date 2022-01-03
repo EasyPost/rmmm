@@ -1,3 +1,7 @@
+0.2.1
+=====
+- Pin some more specific versions
+
 0.2.0
 =====
 - Bump a bunch of dependencies, including `clap` and `mysql`
