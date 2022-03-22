@@ -26,7 +26,12 @@ Configuration is typically through environment variables:
 | Environment Variable | Meaning |
 |----------------------|---------|
 | `$DATABASE_URL` | URL (`mysql://`) to connect to MySQL |
+| `$DATABASE_DSN` | DSN (as per [1](https://github.com/go-sql-driver/mysql/#user-content-dsn-data-source-name)) to
+connect to MySQL |
 | `$MIGRATION_PATH` | Path to store state (defaults to `./db`) |
+
+Either `$DATABASE_URL` or `DATABASE_DSN` must be passed. They can also be passed to the program as `--database-dsn` or
+`--database-url`.
 
 This work is licensed under the ISC license, a copy of which can be found in [LICENSE.txt](LICENSE.txt).
 

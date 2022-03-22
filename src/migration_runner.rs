@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::env;
 
 use anyhow::Context;
 use chrono::{TimeZone, Utc};
@@ -7,6 +6,7 @@ use itertools::Itertools;
 use log::{debug, warn};
 use mysql::prelude::Queryable;
 
+use crate::go_database_dsn::GoDatabaseDsn;
 use crate::migration_state::MigrationState;
 
 pub(crate) struct MigrationRunner {
@@ -45,10 +45,17 @@ impl MigrationPlan {
 }
 
 impl MigrationRunner {
-    pub fn new() -> anyhow::Result<Self> {
-        let url = env::var("DATABASE_URL").context("Must set $DATABASE_URL")?;
+    pub fn from_matches(matches: &clap::ArgMatches) -> anyhow::Result<Self> {
+        let opts = if let Some(url) = matches.value_of("database_url") {
+            mysql::Opts::from_url(&url)?
+        } else if let Some(dsn) = matches.value_of("database_dsn") {
+            let parsed = dsn.parse::<GoDatabaseDsn>()?;
+            parsed.try_into()?
+        } else {
+            anyhow::bail!("must pass either --database-url or --database-dsn")
+        };
         Ok(MigrationRunner {
-            pool: mysql::Pool::new(mysql::Opts::from_url(&url)?)?,
+            pool: mysql::Pool::new(opts)?,
             tx_opts: mysql::TxOpts::default()
                 .set_isolation_level(Some(mysql::IsolationLevel::RepeatableRead)),
         })
