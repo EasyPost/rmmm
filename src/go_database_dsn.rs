@@ -15,7 +15,7 @@ enum AddressName {
 }
 
 impl AddressName {
-    fn as_mysql_string(self) -> String {
+    fn into_mysql_string(self) -> String {
         match self {
             Self::Name(s) => s,
             Self::Address(IpAddr::V4(i)) => i.to_string(),
@@ -45,9 +45,9 @@ impl FromStr for Address {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.chars().next() == Some('[') {
+        if let Some(addr) = s.strip_prefix('[') {
             // IPv6 literal
-            let (addr, rest) = s[1..]
+            let (addr, rest) = addr
                 .split_once(']')
                 .ok_or_else(|| anyhow::anyhow!("invalid IPv6 literal in {}", s))?;
             let addr = AddressName::Address(addr.parse().context("invalid IPv6 literal")?);
@@ -62,18 +62,16 @@ impl FromStr for Address {
                     port: DEFAULT_PORT,
                 })
             }
+        } else if let Some((address, port)) = s.rsplit_once(':') {
+            Ok(Address {
+                name: address.parse()?,
+                port: port.parse()?,
+            })
         } else {
-            if let Some((address, port)) = s.rsplit_once(':') {
-                Ok(Address {
-                    name: address.parse()?,
-                    port: port.parse()?,
-                })
-            } else {
-                Ok(Address {
-                    name: s.parse()?,
-                    port: DEFAULT_PORT,
-                })
-            }
+            Ok(Address {
+                name: s.parse()?,
+                port: DEFAULT_PORT,
+            })
         }
     }
 }
@@ -151,7 +149,7 @@ impl TryInto<mysql::Opts> for GoDatabaseDsn {
             .pass(self.password)
             .db_name(Some(self.database))
             .tcp_port(self.address.port)
-            .ip_or_hostname(Some(self.address.name.as_mysql_string()))
+            .ip_or_hostname(Some(self.address.name.into_mysql_string()))
             .into())
     }
 }
