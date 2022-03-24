@@ -1,3 +1,7 @@
+NEXT
+====
+- Add support for go-style `$DATABASE_DSN` in addition to `$DATABASE_URL`
+
 0.2.1
 =====
 - Pin some more specific versions
