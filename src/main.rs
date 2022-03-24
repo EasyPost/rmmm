@@ -10,9 +10,11 @@ use itertools::Itertools;
 use log::{debug, error, info};
 use tabled::Tabled;
 
+mod go_database_dsn;
 mod migration_runner;
 mod migration_state;
 
+use crate::migration_runner::MigrationRunner;
 use crate::migration_state::MigrationState;
 
 fn initialize_logging(matches: &clap::ArgMatches) {
@@ -64,9 +66,8 @@ struct MigrationStatusRow {
     executed_at: String,
 }
 
-fn command_status(state: MigrationState) -> anyhow::Result<()> {
+fn command_status(state: MigrationState, runner: MigrationRunner) -> anyhow::Result<()> {
     debug!("Starting command_status");
-    let runner = migration_runner::MigrationRunner::new()?;
     let run_so_far = runner.list_run_migrations()?;
     let all_ids = state
         .all_ids()
@@ -103,7 +104,7 @@ fn command_status(state: MigrationState) -> anyhow::Result<()> {
             }
         })
         .collect::<Vec<_>>();
-    let table = tabled::Table::new(&data).with(tabled::Style::PSEUDO_CLEAN);
+    let table = tabled::Table::new(&data).with(tabled::Style::modern().horizontal_off());
     println!("{}", table);
     Ok(())
 }
@@ -115,9 +116,12 @@ struct MigrationPlanRow {
     sql_text: String,
 }
 
-fn command_upgrade(matches: &clap::ArgMatches, state: MigrationState) -> anyhow::Result<()> {
+fn command_upgrade(
+    matches: &clap::ArgMatches,
+    state: MigrationState,
+    runner: MigrationRunner,
+) -> anyhow::Result<()> {
     debug!("Starting command_upgrade");
-    let runner = migration_runner::MigrationRunner::new()?;
     let target_revision = {
         let revision = matches.value_of("revision").unwrap();
         if revision == "latest" {
@@ -146,7 +150,7 @@ fn command_upgrade(matches: &clap::ArgMatches, state: MigrationState) -> anyhow:
         })
         .collect::<Vec<_>>();
     let table = tabled::Table::new(&plan_data)
-        .with(tabled::Style::PSEUDO_CLEAN)
+        .with(tabled::Style::modern().horizontal_off())
         .with(tabled::Modify::new(tabled::Column(2..=2)).with(tabled::Alignment::left()));
     println!("Migration plan:");
     println!("{}", table);
@@ -163,9 +167,8 @@ fn command_upgrade(matches: &clap::ArgMatches, state: MigrationState) -> anyhow:
     Ok(())
 }
 
-fn command_reset(matches: &clap::ArgMatches) -> anyhow::Result<()> {
+fn command_reset(matches: &clap::ArgMatches, runner: MigrationRunner) -> anyhow::Result<()> {
     debug!("Starting command_reset");
-    let runner = migration_runner::MigrationRunner::new()?;
     let tables = runner.list_tables()?;
     println!("Dropping the following tables:");
     for table in &tables {
@@ -181,8 +184,8 @@ fn command_reset(matches: &clap::ArgMatches) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> {
-    let matches = clap::App::new(clap::crate_name!())
+fn cli() -> clap::Command<'static> {
+    clap::Command::new(clap::crate_name!())
         .version(clap::crate_version!())
         .author(clap::crate_authors!())
         .about(clap::crate_description!())
@@ -208,9 +211,34 @@ fn main() -> anyhow::Result<()> {
                 .multiple_occurrences(true)
                 .help("Be more noisy when logging"),
         )
-        .subcommand(clap::App::new("status").about("Show the current status of migrations"))
+        .arg(
+            Arg::new("database_url")
+                .long("database-url")
+                .env("DATABASE_URL")
+                .takes_value(true)
+                .forbid_empty_values(true)
+                .value_hint(clap::ValueHint::Url)
+                .value_name("URL")
+                .help("mysql:// database URL"),
+        )
+        .arg(
+            Arg::new("database_dsn")
+                .long("database-dsn")
+                .env("DATABASE_DSN")
+                .takes_value(true)
+                .forbid_empty_values(true)
+                .value_name("DSN")
+                .help("go-style database DSN"),
+        )
+        .group(
+            clap::ArgGroup::default()
+                .id("database_config")
+                .args(&["database_url", "database_dsn"])
+                .required(true),
+        )
+        .subcommand(clap::Command::new("status").about("Show the current status of migrations"))
         .subcommand(
-            clap::App::new("generate")
+            clap::Command::new("generate")
                 .about("Generate a new migration")
                 .arg(
                     Arg::new("label")
@@ -219,7 +247,7 @@ fn main() -> anyhow::Result<()> {
                 ),
         )
         .subcommand(
-            clap::App::new("upgrade")
+            clap::Command::new("upgrade")
                 .about("Upgrade to the given revision")
                 .arg(
                     Arg::new("revision")
@@ -234,7 +262,7 @@ fn main() -> anyhow::Result<()> {
                 ),
         )
         .subcommand(
-            clap::App::new("downgrade")
+            clap::Command::new("downgrade")
                 .about("Downgrade to the given revision")
                 .arg(
                     Arg::new("revision")
@@ -249,7 +277,7 @@ fn main() -> anyhow::Result<()> {
                 ),
         )
         .subcommand(
-            clap::App::new("reset")
+            clap::Command::new("reset")
                 .about("Drop all tables and totally reset the database (DANGEROUS)")
                 .arg(
                     Arg::new("execute")
@@ -258,29 +286,44 @@ fn main() -> anyhow::Result<()> {
                         .help("Actually reset"),
                 ),
         )
-        .get_matches();
+}
+
+fn main() -> anyhow::Result<()> {
+    let matches = cli().get_matches();
 
     initialize_logging(&matches);
 
     let current_state = MigrationState::load(matches.value_of("migration_path").unwrap())?;
+
+    let runner = MigrationRunner::from_matches(&matches)?;
 
     match matches.subcommand() {
         Some(("generate", smatches)) => {
             current_state.generate(smatches.value_of("label").unwrap())?
         }
         Some(("status", _)) => {
-            command_status(current_state)?;
+            command_status(current_state, runner)?;
         }
         Some(("upgrade", smatches)) => {
-            command_upgrade(smatches, current_state)?;
+            command_upgrade(smatches, current_state, runner)?;
         }
         Some(("downgrade", smatches)) => {
-            command_upgrade(smatches, current_state)?;
+            command_upgrade(smatches, current_state, runner)?;
         }
-        Some(("reset", smatches)) => command_reset(smatches)?,
+        Some(("reset", smatches)) => command_reset(smatches, runner)?,
         _ => {
             anyhow::bail!("Must pass a command!");
         }
     };
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cli;
+
+    #[test]
+    fn test_cli() {
+        cli().debug_assert();
+    }
 }
