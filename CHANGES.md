@@ -1,4 +1,4 @@
-NEXT
+0.2.2
 ====
 - Add support for go-style `$DATABASE_DSN` in addition to `$DATABASE_URL`
 
