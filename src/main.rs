@@ -167,7 +167,7 @@ fn command_upgrade(
     Ok(())
 }
 
-fn command_reset(matches: &clap::ArgMatches, runner: MigrationRunner) -> anyhow::Result<()> {
+fn command_reset(matches: &clap::ArgMatches, runner: &MigrationRunner) -> anyhow::Result<()> {
     debug!("Starting command_reset");
     let tables = runner.list_tables()?;
     println!("Dropping the following tables:");
@@ -179,7 +179,30 @@ fn command_reset(matches: &clap::ArgMatches, runner: MigrationRunner) -> anyhow:
             runner.drop_table(&table)?;
         }
     } else {
-        error!("rerun with --execute to execute this plan");
+        error!("rerun with --execute to execute this reset plan");
+    }
+    Ok(())
+}
+
+fn command_apply_snapshot(
+    matches: &clap::ArgMatches,
+    state: MigrationState,
+    runner: &MigrationRunner,
+) -> anyhow::Result<()> {
+    command_reset(matches, runner)?;
+    let schema = state.read_schema()?;
+    if matches.is_present("execute") {
+        runner.apply_schema_snapshot(&schema)?;
+        let run_so_far = runner.list_run_migrations()?;
+        println!(
+            "Migrations applied after snapshot application: {:?}",
+            run_so_far.into_iter().map(|r| r.id).collect::<Vec<_>>()
+        );
+    } else {
+        error!(
+            "rerun with --execute to apply the {0}-byte snapshot from structure.sql",
+            schema.len()
+        );
     }
     Ok(())
 }
@@ -258,8 +281,18 @@ fn cli() -> clap::Command<'static> {
                     Arg::new("execute")
                         .short('x')
                         .long("execute")
-                        .help("Actually upgrade (otherwise will just print what will be done"),
+                        .help("Actually upgrade (otherwise will just print what would be done)"),
                 ),
+        )
+        .subcommand(
+            clap::Command::new("apply-snapshot")
+                .about("Apply a snapshot (structure.sql file). Does the equivalent of a reset first.")
+                .arg(
+                    Arg::new("execute")
+                    .short('x')
+                    .long("execute")
+                    .help("Actually wipe and apply the snapshot (otherwise, will just print what would be done)")
+                )
         )
         .subcommand(
             clap::Command::new("downgrade")
@@ -310,7 +343,10 @@ fn main() -> anyhow::Result<()> {
         Some(("downgrade", smatches)) => {
             command_upgrade(smatches, current_state, runner)?;
         }
-        Some(("reset", smatches)) => command_reset(smatches, runner)?,
+        Some(("apply-snapshot", smatches)) => {
+            command_apply_snapshot(smatches, current_state, &runner)?;
+        }
+        Some(("reset", smatches)) => command_reset(smatches, &runner)?,
         _ => {
             anyhow::bail!("Must pass a command!");
         }

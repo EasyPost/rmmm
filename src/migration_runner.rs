@@ -188,6 +188,20 @@ impl MigrationRunner {
         Ok(())
     }
 
+    pub fn apply_schema_snapshot(&self, schema: &str) -> anyhow::Result<()> {
+        let mut tx = self.pool.start_transaction(self.tx_opts)?;
+        for command in schema.split(";\n") {
+            let command = command.replace('\n', " ").trim().to_owned();
+            if command.is_empty() {
+                continue;
+            }
+            debug!("executing {:?}", command);
+            tx.query_drop(command)?
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn list_tables(&self) -> anyhow::Result<Vec<String>> {
         let mut tx = self.pool.start_transaction(self.tx_opts)?;
         let db_name = tx
@@ -230,7 +244,7 @@ impl MigrationRunner {
                 "SELECT id, label FROM rmmm_migrations ORDER BY id ASC",
                 |(id, label): (u64, String)| {
                     format!(
-                        "INSERT INTO rmmm_migrations(id, label, executed_at) VALUES({}, '{}', NOW());",
+                        "INSERT INTO rmmm_migrations(id, label, executed_at) VALUES({}, '{}', UNIX_TIMESTAMP());",
                         id,
                         label,
                     )

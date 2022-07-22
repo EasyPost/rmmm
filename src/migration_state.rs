@@ -154,6 +154,11 @@ impl MigrationState {
         std::fs::write(schema_file, schema)?;
         Ok(())
     }
+
+    pub fn read_schema(&self) -> anyhow::Result<String> {
+        let schema_file = self.root_path.join("structure.sql");
+        std::fs::read_to_string(schema_file).map_err(|e| e.into())
+    }
 }
 
 #[cfg(test)]

@@ -13,7 +13,7 @@ categories = ["command-line-utilities", "database", "development-tools"]
 [dependencies]
 anyhow = "1"
 chrono = "0.4"
-clap = { version = "3.1", features=["std", "color", "suggestions", "cargo", "env", "wrap_help"] }
+clap = { version = "3.2", features=["std", "color", "suggestions", "cargo", "env", "wrap_help"] }
 derive_more = "0.99"
 fern = {version = "0.6", features=["colored"]}
 itertools = "0.10"
