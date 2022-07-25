@@ -1,3 +1,7 @@
+0.3.0
+=====
+- Add the new `apply-snapshot` subcommand (#4, #5)
+
 0.2.2
 ====
 - Add support for go-style `$DATABASE_DSN` in addition to `$DATABASE_URL`
