@@ -348,6 +348,7 @@ fn main() -> anyhow::Result<()> {
         }
         Some(("reset", smatches)) => command_reset(smatches, &runner)?,
         _ => {
+            cli().print_help()?;
             anyhow::bail!("Must pass a command!");
         }
     };
