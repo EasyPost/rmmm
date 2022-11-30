@@ -61,6 +61,7 @@ impl MigrationRunner {
         })
     }
 
+    #[allow(deprecated)]
     pub fn list_run_migrations(&self) -> anyhow::Result<Vec<ExecutedMigration>> {
         let mut tx = self.pool.start_transaction(self.tx_opts)?;
         if tx
