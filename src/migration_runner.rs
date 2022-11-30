@@ -17,7 +17,7 @@ pub(crate) struct MigrationRunner {
 #[derive(Debug)]
 pub struct ExecutedMigration {
     pub id: usize,
-    pub executed_at: chrono::DateTime<Utc>,
+    pub executed_at: Option<chrono::DateTime<Utc>>,
 }
 
 #[derive(Debug)]
@@ -77,7 +77,7 @@ impl MigrationRunner {
             "SELECT id, executed_at FROM rmmm_migrations",
             |(id, executed_at)| ExecutedMigration {
                 id,
-                executed_at: Utc.timestamp(executed_at, 0),
+                executed_at: Utc.timestamp_opt(executed_at, 0).single(),
             },
         )?;
         Ok(rows)
