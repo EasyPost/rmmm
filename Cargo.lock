@@ -1184,7 +1184,6 @@ dependencies = [
  "derive_more",
  "fern",
  "flate2",
- "funty",
  "itertools",
  "lazy_static",
  "log",
