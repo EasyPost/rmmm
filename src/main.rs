@@ -90,7 +90,7 @@ fn command_status(state: MigrationState, runner: MigrationRunner) -> anyhow::Res
             };
             let executed_at = run_so_far_by_id
                 .get(&id)
-                .map(|r| r.executed_at.to_rfc3339())
+                .map(|r| r.executed_at.map_or("".to_string(), |ea| ea.to_rfc3339()))
                 .unwrap_or_else(|| "".to_string());
             MigrationStatusRow {
                 id,
