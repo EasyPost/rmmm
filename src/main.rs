@@ -167,12 +167,18 @@ fn command_upgrade(
     Ok(())
 }
 
-fn command_reset(matches: &clap::ArgMatches, runner: &MigrationRunner) -> anyhow::Result<()> {
+fn command_reset(
+    matches: &clap::ArgMatches,
+    runner: &MigrationRunner,
+    quiet: bool,
+) -> anyhow::Result<()> {
     debug!("Starting command_reset");
     let tables = runner.list_tables()?;
-    println!("Dropping the following tables:");
-    for table in &tables {
-        println!(" - {}", table);
+    if !quiet {
+        println!("Dropping the following tables:");
+        for table in &tables {
+            println!(" - {}", table);
+        }
     }
     if matches.is_present("execute") {
         for table in tables {
@@ -188,8 +194,9 @@ fn command_apply_snapshot(
     matches: &clap::ArgMatches,
     state: MigrationState,
     runner: &MigrationRunner,
+    quiet: bool,
 ) -> anyhow::Result<()> {
-    command_reset(matches, runner)?;
+    command_reset(matches, runner, quiet)?;
     let schema = state.read_schema()?;
     if matches.is_present("execute") {
         runner.apply_schema_snapshot(&schema)?;
@@ -344,9 +351,14 @@ fn main() -> anyhow::Result<()> {
             command_upgrade(smatches, current_state, runner)?;
         }
         Some(("apply-snapshot", smatches)) => {
-            command_apply_snapshot(smatches, current_state, &runner)?;
+            command_apply_snapshot(
+                smatches,
+                current_state,
+                &runner,
+                matches.is_present("quiet"),
+            )?;
         }
-        Some(("reset", smatches)) => command_reset(smatches, &runner)?,
+        Some(("reset", smatches)) => command_reset(smatches, &runner, matches.is_present("quiet"))?,
         _ => {
             cli().print_help()?;
             anyhow::bail!("Must pass a command!");
