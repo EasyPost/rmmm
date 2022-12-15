@@ -1,6 +1,6 @@
 [package]
 name = "rmmm"
-version = "0.3.1"
+version = "0.3.2"
 description = "Rust MySQL Migration Manager"
 repository = "https://github.com/EasyPost/rmmm"
 authors = ["James Brown <jbrown@easypost.com>"]
