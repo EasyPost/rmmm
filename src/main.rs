@@ -294,7 +294,7 @@ fn cli() -> clap::Command<'static> {
                 )
                 .arg(
                     Arg::new("no-dump")
-                        .help("Do not upgrade db/structure.sql when done"),
+                        .help("Do not write updated db/structure.sql when done"),
                 ),
         )
         .subcommand(
