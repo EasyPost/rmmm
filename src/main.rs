@@ -294,6 +294,9 @@ fn cli() -> clap::Command<'static> {
                 )
                 .arg(
                     Arg::new("no-dump")
+                        .long("--no-write-schema")
+                        .env("NO_WRITE_SCHEMA")
+                        .action(clap::ArgAction::SetTrue)
                         .help("Do not write updated db/structure.sql when done"),
                 ),
         )
