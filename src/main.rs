@@ -160,7 +160,9 @@ fn command_upgrade(
         info!("done!");
         println!("New version: {}", target_revision);
         let schema = runner.dump_schema()?;
-        state.write_schema(&schema)?;
+        if !matches.is_present("no-dump") {
+            state.write_schema(&schema)?;
+        }
     } else {
         error!("rerun with --execute to execute this plan");
     }
@@ -289,6 +291,10 @@ fn cli() -> clap::Command<'static> {
                         .short('x')
                         .long("execute")
                         .help("Actually upgrade (otherwise will just print what would be done)"),
+                )
+                .arg(
+                    Arg::new("no-dump")
+                        .help("Do not write updated db/structure.sql when done"),
                 ),
         )
         .subcommand(
