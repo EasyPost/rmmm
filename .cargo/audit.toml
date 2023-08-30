@@ -1,0 +1,7 @@
+# RUSTSEC-2020-0071 is sound will remove time in 5.0 https://github.com/chronotope/chrono/releases/tag/v0.4.20
+# RUSTSEC-2023-0052 2023-08 no fix yet. I can not patch in the fork. Need to wait for mysql to update.
+[advisories]
+ignore = [
+    "RUSTSEC-2020-0071", # `time` localtime_r segfault
+    "RUSTSEC-2023-0052", 
+]
