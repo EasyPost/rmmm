@@ -1,3 +1,23 @@
+0.4.2
+=====
+- Update dependencies for cargo audit.
+
+0.4.1
+=====
+- add long arg for no-dump "--no-write-schema" 
+
+0.4.0
+=====
+- Add no-dump feature
+
+0.3.2
+=====
+- TODO 
+
+0.3.1
+=====
+- TODO 
+
 0.3.0
 =====
 - Add the new `apply-snapshot` subcommand (#4, #5)
