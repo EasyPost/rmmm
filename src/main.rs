@@ -18,10 +18,7 @@ use crate::migration_runner::MigrationRunner;
 use crate::migration_state::MigrationState;
 
 fn initialize_logging(matches: &clap::ArgMatches) {
-    let log_level = match (
-        matches.is_present("quiet"),
-        matches.occurrences_of("verbose"),
-    ) {
+    let log_level = match (matches.contains_id("quiet"), matches.get_count("verbose")) {
         (true, _) => log::LevelFilter::Error,
         (false, 0) => env::var("RUST_LOG")
             .ok()
@@ -123,7 +120,7 @@ fn command_upgrade(
 ) -> anyhow::Result<()> {
     debug!("Starting command_upgrade");
     let target_revision = {
-        let revision = matches.value_of("revision").unwrap();
+        let revision = matches.get_one::<String>("revision").unwrap();
         if revision == "latest" {
             state.highest_id()
         } else {
@@ -154,13 +151,13 @@ fn command_upgrade(
         .with(tabled::Modify::new(tabled::Column(2..=2)).with(tabled::Alignment::left()));
     println!("Migration plan:");
     println!("{}", table);
-    if matches.is_present("execute") {
+    if matches.contains_id("execute") {
         info!("executing plan with {} steps", plan.steps().len());
         runner.execute(plan)?;
         info!("done!");
         println!("New version: {}", target_revision);
         let schema = runner.dump_schema()?;
-        if !matches.is_present("no-dump") {
+        if !matches.contains_id("no-dump") {
             state.write_schema(&schema)?;
         }
     } else {
@@ -182,7 +179,7 @@ fn command_reset(
             println!(" - {}", table);
         }
     }
-    if matches.is_present("execute") {
+    if matches.contains_id("execute") {
         for table in tables {
             runner.drop_table(&table)?;
         }
@@ -200,7 +197,7 @@ fn command_apply_snapshot(
 ) -> anyhow::Result<()> {
     command_reset(matches, runner, quiet)?;
     let schema = state.read_schema()?;
-    if matches.is_present("execute") {
+    if matches.contains_id("execute") {
         runner.apply_schema_snapshot(&schema)?;
         let run_so_far = runner.list_run_migrations()?;
         println!(
@@ -216,7 +213,7 @@ fn command_apply_snapshot(
     Ok(())
 }
 
-fn cli() -> clap::Command<'static> {
+fn cli() -> clap::Command {
     clap::Command::new(clap::crate_name!())
         .version(clap::crate_version!())
         .author(clap::crate_authors!())
@@ -225,7 +222,7 @@ fn cli() -> clap::Command<'static> {
             Arg::new("migration_path")
                 .short('p')
                 .long("migration-path")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("db")
                 .env("MIGRATION_PATH")
                 .help("Directory in which state is stored"),
@@ -240,15 +237,15 @@ fn cli() -> clap::Command<'static> {
             Arg::new("verbose")
                 .short('v')
                 .long("verbose")
-                .multiple_occurrences(true)
+                .num_args(1..)
                 .help("Be more noisy when logging"),
         )
         .arg(
             Arg::new("database_url")
                 .long("database-url")
                 .env("DATABASE_URL")
-                .takes_value(true)
-                .forbid_empty_values(true)
+                .num_args(1)
+                .value_parser(clap::builder::NonEmptyStringValueParser::new())
                 .value_hint(clap::ValueHint::Url)
                 .value_name("URL")
                 .help("mysql:// database URL"),
@@ -257,8 +254,8 @@ fn cli() -> clap::Command<'static> {
             Arg::new("database_dsn")
                 .long("database-dsn")
                 .env("DATABASE_DSN")
-                .takes_value(true)
-                .forbid_empty_values(true)
+                .num_args(1)
+                .value_parser(clap::builder::NonEmptyStringValueParser::new())
                 .value_name("DSN")
                 .help("go-style database DSN"),
         )
@@ -294,7 +291,7 @@ fn cli() -> clap::Command<'static> {
                 )
                 .arg(
                     Arg::new("no-dump")
-                        .long("--no-write-schema")
+                        .long("no-write-schema")
                         .env("NO_WRITE_SCHEMA")
                         .action(clap::ArgAction::SetTrue)
                         .help("Do not write updated db/structure.sql when done"),
@@ -342,13 +339,13 @@ fn main() -> anyhow::Result<()> {
 
     initialize_logging(&matches);
 
-    let current_state = MigrationState::load(matches.value_of("migration_path").unwrap())?;
+    let current_state = MigrationState::load(matches.get_one::<String>("migration_path").unwrap())?;
 
     let runner = MigrationRunner::from_matches(&matches)?;
 
     match matches.subcommand() {
         Some(("generate", smatches)) => {
-            current_state.generate(smatches.value_of("label").unwrap())?
+            current_state.generate(smatches.get_one::<String>("label").unwrap())?
         }
         Some(("status", _)) => {
             command_status(current_state, runner)?;
@@ -364,10 +361,12 @@ fn main() -> anyhow::Result<()> {
                 smatches,
                 current_state,
                 &runner,
-                matches.is_present("quiet"),
+                matches.contains_id("quiet"),
             )?;
         }
-        Some(("reset", smatches)) => command_reset(smatches, &runner, matches.is_present("quiet"))?,
+        Some(("reset", smatches)) => {
+            command_reset(smatches, &runner, matches.contains_id("quiet"))?
+        }
         _ => {
             cli().print_help()?;
             anyhow::bail!("Must pass a command!");

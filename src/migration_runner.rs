@@ -46,9 +46,9 @@ impl MigrationPlan {
 
 impl MigrationRunner {
     pub fn from_matches(matches: &clap::ArgMatches) -> anyhow::Result<Self> {
-        let opts = if let Some(url) = matches.value_of("database_url") {
+        let opts = if let Some(url) = matches.get_one::<String>("database_url") {
             mysql::Opts::from_url(url)?
-        } else if let Some(dsn) = matches.value_of("database_dsn") {
+        } else if let Some(dsn) = matches.get_one::<String>("database_dsn") {
             let parsed = dsn.parse::<GoDatabaseDsn>()?;
             parsed.try_into()?
         } else {
