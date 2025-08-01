@@ -5,7 +5,7 @@ description = "Rust MySQL Migration Manager"
 repository = "https://github.com/EasyPost/rmmm"
 authors = ["James Brown <jbrown@easypost.com>"]
 readme = "README.md"
-edition = "2021"
+edition = "2024"
 license = "ISC"
 keywords = ["database", "mysql", "schema"]
 categories = ["command-line-utilities", "database", "development-tools"]
@@ -19,10 +19,10 @@ fern = {version = "0.6", features=["colored"]}
 itertools = "0.10"
 lazy_static = "1"
 log = "0.4"
-mysql = { version = "23", default_features = false }
+mysql = { version = "26", default-features = false }
 # these next two are only in here to set features used by mysql
-flate2 = { version = "1", default_features = false, features = ["zlib"] }
-mysql_common = { version = "^0.29", default_features = false, features = ["time03"]}
+flate2 = { version = "1", default-features = false, features = ["zlib"] }
+mysql_common = { version = "^0.29", default-features = false, features = ["time03"]}
 once_cell = "1"
 regex = "1"
 tabled = "0.5"
