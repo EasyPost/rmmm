@@ -113,7 +113,10 @@ impl MigrationState {
         {
             let mut f = f.as_file();
             writeln!(f, "/* rmmm migration v{0} - {1} */", self.next_id, label)?;
-            writeln!(f, "\n-- Delete this comment and put your migration here. Blank lines and comments are ignored.")?;
+            writeln!(
+                f,
+                "\n-- Delete this comment and put your migration here. Blank lines and comments are ignored."
+            )?;
             writeln!(
                 f,
                 "-- Create {0}/v{1}_downgrade.sql to make this migraiton reversible",

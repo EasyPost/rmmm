@@ -147,8 +147,7 @@ fn command_apply_migrations(
         .collect::<Vec<_>>();
     let table = tabled::Table::new(&plan_data)
         .with(tabled::Style::modern().horizontal_off())
-        .with(tabled::Modify::new(tabled::Column(1..=1)).with(tabled::Alignment::left()))
-        ;
+        .with(tabled::Modify::new(tabled::Column(1..=1)).with(tabled::Alignment::left()));
     println!("Migration plan:");
     println!("{}", table);
     if matches.is_present("execute") {

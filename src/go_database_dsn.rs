@@ -173,7 +173,7 @@ impl TryInto<mysql::Opts> for GoDatabaseDsn {
 
 #[cfg(test)]
 mod tests {
-    use super::{Address, AddressName, GoDatabaseDsn, DEFAULT_PORT};
+    use super::{Address, AddressName, DEFAULT_PORT, GoDatabaseDsn};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     use anyhow::Context;
@@ -255,10 +255,7 @@ mod tests {
                 port: DEFAULT_PORT,
             }
         );
-        assert_eq!(
-            parsed.protocol,
-            "unix",
-        );
+        assert_eq!(parsed.protocol, "unix",);
         assert_eq!(parsed.username.as_deref(), Some("foo"));
         assert_eq!(parsed.password.as_deref(), Some("bar"));
         assert_eq!(parsed.database, "foodb".to_string());
