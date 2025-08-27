@@ -105,7 +105,7 @@ fn command_status(state: MigrationState, runner: MigrationRunner) -> anyhow::Res
         })
         .collect::<Vec<_>>();
     let table = tabled::Table::new(&data).with(tabled::Style::modern().horizontal_off());
-    println!("{}", table);
+    println!("{table}");
     Ok(())
 }
 
@@ -149,12 +149,12 @@ fn command_apply_migrations(
         .with(tabled::Style::modern().horizontal_off())
         .with(tabled::Modify::new(tabled::Column(1..=1)).with(tabled::Alignment::left()));
     println!("Migration plan:");
-    println!("{}", table);
+    println!("{table}");
     if matches.is_present("execute") {
         info!("executing plan with {} steps", plan.steps().len());
         runner.execute(plan)?;
         info!("done!");
-        println!("New version: {}", target_revision);
+        println!("New version: {target_revision}");
         if !matches.is_present("no-dump") {
             let schema = runner.dump_schema()?;
             state.write_schema(&schema)?;
@@ -177,7 +177,7 @@ fn command_reset(
     if !quiet {
         println!("Dropping the following tables:");
         for table in &tables {
-            println!(" - {}", table);
+            println!(" - {table}");
         }
     }
     if matches.is_present("execute") {

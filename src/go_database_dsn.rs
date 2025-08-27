@@ -19,7 +19,7 @@ impl AddressName {
         match self {
             Self::Name(s) => s,
             Self::Address(IpAddr::V4(i)) => i.to_string(),
-            Self::Address(IpAddr::V6(i)) => format!("[{}]", i),
+            Self::Address(IpAddr::V6(i)) => format!("[{i}]"),
         }
     }
 }
@@ -269,7 +269,7 @@ mod tests {
             "user:pass@unix(/var/lib/mysql/mysql.sock)/dbname?parseTime=true&sql_mode='STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION'",
         ] {
             s.parse::<GoDatabaseDsn>()
-                .context(format!("attempting to parse {}", s))
+                .context(format!("attempting to parse {s}"))
                 .expect("should parse");
         }
     }

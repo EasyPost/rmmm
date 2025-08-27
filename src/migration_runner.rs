@@ -91,9 +91,9 @@ impl MigrationRunner {
         is_upgrade: bool,
     ) -> anyhow::Result<MigrationPlan> {
         if is_upgrade {
-            return self.plan_upgrade(state, target_revision);
+            self.plan_upgrade(state, target_revision)
         } else {
-            return self.plan_downgrade(state, target_revision);
+            self.plan_downgrade(state, target_revision)
         }
     }
 
@@ -132,7 +132,7 @@ impl MigrationRunner {
             })
             .collect::<Vec<_>>();
         Ok(MigrationPlan {
-            steps: steps,
+            steps,
             is_upgrade: true,
         })
     }
@@ -172,7 +172,7 @@ impl MigrationRunner {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(MigrationPlan {
-            steps: steps,
+            steps,
             is_upgrade: false,
         })
     }
@@ -200,7 +200,7 @@ impl MigrationRunner {
                 if command.is_empty() {
                     continue;
                 }
-                debug!("executing {:?}", command);
+                debug!("executing {command:?}");
                 tx.query_drop(command)?;
             }
             if plan.is_upgrade {
@@ -220,7 +220,7 @@ impl MigrationRunner {
             if command.is_empty() {
                 continue;
             }
-            debug!("executing {:?}", command);
+            debug!("executing {command:?}");
             tx.query_drop(command)?
         }
         tx.commit()?;
@@ -243,7 +243,7 @@ impl MigrationRunner {
     pub fn drop_table(&self, table_name: &str) -> anyhow::Result<()> {
         let mut tx = self.pool.start_transaction(self.tx_opts)?;
         assert!(!table_name.contains('`'));
-        tx.query_drop(format!("DROP TABLE `{}`", table_name))?;
+        tx.query_drop(format!("DROP TABLE `{table_name}`"))?;
         Ok(())
     }
 
@@ -255,7 +255,7 @@ impl MigrationRunner {
         for table_name in &tables {
             assert!(!table_name.contains('`'));
             let schema = tx.query_map(
-                format!("SHOW CREATE TABLE `{}`", table_name),
+                format!("SHOW CREATE TABLE `{table_name}`"),
                 |(_table_name, mut schema): (String, String)| {
                     schema.push(';');
                     schema
@@ -270,9 +270,7 @@ impl MigrationRunner {
                 "SELECT id, label FROM rmmm_migrations ORDER BY id ASC",
                 |(id, label): (u64, String)| {
                     format!(
-                        "INSERT INTO rmmm_migrations(id, label, executed_at) VALUES({}, '{}', UNIX_TIMESTAMP());",
-                        id,
-                        label,
+                        "INSERT INTO rmmm_migrations(id, label, executed_at) VALUES({id}, '{label}', UNIX_TIMESTAMP());",
                     )
                 },
             )?);
