@@ -91,9 +91,9 @@ impl MigrationRunner {
         is_upgrade: bool,
     ) -> anyhow::Result<MigrationPlan> {
         if is_upgrade {
-            return self.plan_upgrade(state, target_revision)
+            self.plan_upgrade(state, target_revision)
         } else {
-            return self.plan_downgrade(state, target_revision)
+            self.plan_downgrade(state, target_revision)
         }
     }
 
@@ -114,31 +114,33 @@ impl MigrationRunner {
 
         let state_by_id = state.migrations_by_id();
         let to_run = state
-                .all_ids()
-                .difference(&run_ids)
-                .filter(|&&i| i <= target_revision)
-                .cloned()
-                .sorted()
-                .collect::<Vec<u32>>();
-        let steps =
-            to_run
-                .into_iter()
-                .map(|id| {
-                    let step = state_by_id.get(&id).unwrap();
-                    MigrationStep {
-                        id,
-                        label: step.label.clone(),
-                        sql: step.upgrade_text.clone(),
-                    }
-                })
-                .collect::<Vec<_>>();
-        Ok(MigrationPlan { steps: steps, is_upgrade: true })
+            .all_ids()
+            .difference(&run_ids)
+            .filter(|&&i| i <= target_revision)
+            .cloned()
+            .sorted()
+            .collect::<Vec<u32>>();
+        let steps = to_run
+            .into_iter()
+            .map(|id| {
+                let step = state_by_id.get(&id).unwrap();
+                MigrationStep {
+                    id,
+                    label: step.label.clone(),
+                    sql: step.upgrade_text.clone(),
+                }
+            })
+            .collect::<Vec<_>>();
+        Ok(MigrationPlan {
+            steps,
+            is_upgrade: true,
+        })
     }
 
     pub fn plan_downgrade(
         &self,
         state: &MigrationState,
-        target_revision: u32
+        target_revision: u32,
     ) -> anyhow::Result<MigrationPlan> {
         let state_by_id = state.migrations_by_id();
         let run_ids = self
@@ -148,29 +150,31 @@ impl MigrationRunner {
             .collect::<BTreeSet<u32>>();
 
         let to_run = run_ids
-                .iter()
-                .filter(|&&i| i > target_revision)
-                .cloned()
-                .collect::<Vec<u32>>();
+            .iter()
+            .filter(|&&i| i > target_revision)
+            .cloned()
+            .collect::<Vec<u32>>();
 
-        let steps =
-            to_run
-                .into_iter()
-                .rev()
-                .map(|id| {
-                    let step = state_by_id.get(&id).unwrap();
-                    if let Some(sql) = step.downgrade_text.as_ref() {
-                        Ok(MigrationStep {
-                            id,
-                            label: step.label.clone(),
-                            sql: sql.clone(),
-                        })
-                    } else {
-                        anyhow::bail!("step {:?} is irreversible", id);
-                    }
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?;
-        Ok(MigrationPlan { steps: steps, is_upgrade: false })
+        let steps = to_run
+            .into_iter()
+            .rev()
+            .map(|id| {
+                let step = state_by_id.get(&id).unwrap();
+                if let Some(sql) = step.downgrade_text.as_ref() {
+                    Ok(MigrationStep {
+                        id,
+                        label: step.label.clone(),
+                        sql: sql.clone(),
+                    })
+                } else {
+                    anyhow::bail!("step {:?} is irreversible", id);
+                }
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok(MigrationPlan {
+            steps,
+            is_upgrade: false,
+        })
     }
 
     fn now(&self) -> u64 {
@@ -196,7 +200,7 @@ impl MigrationRunner {
                 if command.is_empty() {
                     continue;
                 }
-                debug!("executing {:?}", command);
+                debug!("executing {command:?}");
                 tx.query_drop(command)?;
             }
             if plan.is_upgrade {
@@ -216,7 +220,7 @@ impl MigrationRunner {
             if command.is_empty() {
                 continue;
             }
-            debug!("executing {:?}", command);
+            debug!("executing {command:?}");
             tx.query_drop(command)?
         }
         tx.commit()?;
@@ -239,7 +243,7 @@ impl MigrationRunner {
     pub fn drop_table(&self, table_name: &str) -> anyhow::Result<()> {
         let mut tx = self.pool.start_transaction(self.tx_opts)?;
         assert!(!table_name.contains('`'));
-        tx.query_drop(format!("DROP TABLE `{}`", table_name))?;
+        tx.query_drop(format!("DROP TABLE `{table_name}`"))?;
         Ok(())
     }
 
@@ -251,7 +255,7 @@ impl MigrationRunner {
         for table_name in &tables {
             assert!(!table_name.contains('`'));
             let schema = tx.query_map(
-                format!("SHOW CREATE TABLE `{}`", table_name),
+                format!("SHOW CREATE TABLE `{table_name}`"),
                 |(_table_name, mut schema): (String, String)| {
                     schema.push(';');
                     schema
@@ -266,9 +270,7 @@ impl MigrationRunner {
                 "SELECT id, label FROM rmmm_migrations ORDER BY id ASC",
                 |(id, label): (u64, String)| {
                     format!(
-                        "INSERT INTO rmmm_migrations(id, label, executed_at) VALUES({}, '{}', UNIX_TIMESTAMP());",
-                        id,
-                        label,
+                        "INSERT INTO rmmm_migrations(id, label, executed_at) VALUES({id}, '{label}', UNIX_TIMESTAMP());",
                     )
                 },
             )?);
