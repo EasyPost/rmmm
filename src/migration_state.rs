@@ -7,11 +7,11 @@ use anyhow::Context;
 use itertools::Itertools;
 use log::debug;
 
-const DEFAULT_EDITOR: &str = "nano";
+const DEFAULT_EDITOR: &str = "vim";
 
 #[derive(Debug)]
 pub(crate) struct Migration {
-    pub id: usize,
+    pub id: u32,
     pub label: Option<String>,
     pub upgrade_text: String,
     pub downgrade_text: Option<String>,
@@ -34,7 +34,7 @@ impl Migration {
         Ok(s.to_string())
     }
 
-    fn from_path(id: usize, p: &Path) -> anyhow::Result<Self> {
+    fn from_path(id: u32, p: &Path) -> anyhow::Result<Self> {
         let upgrade_file = std::fs::read_to_string(p)?;
         lazy_static::lazy_static! {
             static ref LABEL_RE: regex::Regex =
@@ -66,7 +66,7 @@ impl Migration {
 pub(crate) struct MigrationState {
     root_path: PathBuf,
     pub migrations: Vec<Migration>,
-    next_id: usize,
+    next_id: u32,
 }
 
 impl MigrationState {
@@ -137,15 +137,15 @@ impl MigrationState {
         Ok(())
     }
 
-    pub fn migrations_by_id(&self) -> BTreeMap<usize, &Migration> {
+    pub fn migrations_by_id(&self) -> BTreeMap<u32, &Migration> {
         self.migrations.iter().map(|m| (m.id, m)).collect()
     }
 
-    pub fn all_ids(&self) -> BTreeSet<usize> {
+    pub fn all_ids(&self) -> BTreeSet<u32> {
         self.migrations.iter().map(|m| m.id).collect()
     }
 
-    pub fn highest_id(&self) -> usize {
+    pub fn highest_id(&self) -> u32 {
         self.next_id - 1
     }
 

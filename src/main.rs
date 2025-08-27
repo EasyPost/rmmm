@@ -60,7 +60,7 @@ enum MigrationStatus {
 
 #[derive(Tabled, Debug)]
 struct MigrationStatusRow {
-    id: usize,
+    id: u32,
     label: String,
     status: MigrationStatus,
     executed_at: String,
@@ -71,9 +71,9 @@ fn command_status(state: MigrationState, runner: MigrationRunner) -> anyhow::Res
     let run_so_far = runner.list_run_migrations()?;
     let all_ids = state
         .all_ids()
-        .union(&run_so_far.iter().map(|m| m.id).collect::<BTreeSet<usize>>())
+        .union(&run_so_far.iter().map(|m| m.id).collect::<BTreeSet<u32>>())
         .cloned()
-        .collect::<BTreeSet<usize>>();
+        .collect::<BTreeSet<u32>>();
     let migrations_by_id = state.migrations_by_id();
     let run_so_far_by_id = run_so_far
         .into_iter()
@@ -111,15 +111,15 @@ fn command_status(state: MigrationState, runner: MigrationRunner) -> anyhow::Res
 
 #[derive(Tabled, Debug)]
 struct MigrationPlanRow {
-    id: usize,
-    prev_id: String,
+    id: u32,
     sql_text: String,
 }
 
-fn command_upgrade(
+fn command_apply_migrations(
     matches: &clap::ArgMatches,
     state: MigrationState,
     runner: MigrationRunner,
+    is_upgrade: bool,
 ) -> anyhow::Result<()> {
     debug!("Starting command_upgrade");
     let target_revision = {
@@ -132,7 +132,7 @@ fn command_upgrade(
                 .context("revision must be an integer or 'latest'")?
         }
     };
-    let plan = runner.plan(&state, target_revision)?;
+    let plan = runner.plan(&state, target_revision, is_upgrade)?;
     if plan.is_empty() {
         info!("Nothing to do!");
         return Ok(());
@@ -142,16 +142,13 @@ fn command_upgrade(
         .iter()
         .map(|ps| MigrationPlanRow {
             id: ps.id,
-            prev_id: ps
-                .prev_id
-                .map(|u| u.to_string())
-                .unwrap_or_else(|| "(none)".to_string()),
             sql_text: ps.sql.clone(),
         })
         .collect::<Vec<_>>();
     let table = tabled::Table::new(&plan_data)
         .with(tabled::Style::modern().horizontal_off())
-        .with(tabled::Modify::new(tabled::Column(2..=2)).with(tabled::Alignment::left()));
+        .with(tabled::Modify::new(tabled::Column(1..=1)).with(tabled::Alignment::left()))
+        ;
     println!("Migration plan:");
     println!("{}", table);
     if matches.is_present("execute") {
@@ -159,9 +156,11 @@ fn command_upgrade(
         runner.execute(plan)?;
         info!("done!");
         println!("New version: {}", target_revision);
-        let schema = runner.dump_schema()?;
         if !matches.is_present("no-dump") {
+            let schema = runner.dump_schema()?;
             state.write_schema(&schema)?;
+        } else {
+            println!("not writing schema file");
         }
     } else {
         error!("rerun with --execute to execute this plan");
@@ -296,7 +295,6 @@ fn cli() -> clap::Command<'static> {
                     Arg::new("no-dump")
                         .long("--no-write-schema")
                         .env("NO_WRITE_SCHEMA")
-                        .action(clap::ArgAction::SetTrue)
                         .help("Do not write updated db/structure.sql when done"),
                 ),
         )
@@ -323,6 +321,12 @@ fn cli() -> clap::Command<'static> {
                         .short('x')
                         .long("execute")
                         .help("Actually upgrade (otherwise will just print what will be done"),
+                )
+                .arg(
+                    Arg::new("no-dump")
+                        .long("--no-write-schema")
+                        .env("NO_WRITE_SCHEMA")
+                        .help("Do not write updated db/structure.sql when done"),
                 ),
         )
         .subcommand(
@@ -354,10 +358,10 @@ fn main() -> anyhow::Result<()> {
             command_status(current_state, runner)?;
         }
         Some(("upgrade", smatches)) => {
-            command_upgrade(smatches, current_state, runner)?;
+            command_apply_migrations(smatches, current_state, runner, true)?;
         }
         Some(("downgrade", smatches)) => {
-            command_upgrade(smatches, current_state, runner)?;
+            command_apply_migrations(smatches, current_state, runner, false)?;
         }
         Some(("apply-snapshot", smatches)) => {
             command_apply_snapshot(

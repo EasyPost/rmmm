@@ -103,6 +103,7 @@ static DSN_REGEX: Lazy<Regex> = Lazy::new(|| {
 pub(crate) struct GoDatabaseDsn {
     username: Option<String>,
     password: Option<String>,
+    protocol: String,
     address: Address,
     database: String,
 }
@@ -118,9 +119,15 @@ impl FromStr for GoDatabaseDsn {
         let password = caps.name("password").map(|s| s.as_str().to_owned());
         match caps.name("protocol").map(|s| s.as_str()) {
             Some("tcp") => {}
+            Some("unix") => {}
             Some(other) => anyhow::bail!("unhandled DSN protocol {}", other),
             None => {}
         }
+        let protocol = caps
+            .name("protocol")
+            .ok_or_else(|| anyhow::anyhow!("no protocol in DSN {}", s))?
+            .as_str()
+            .to_owned();
         let address = caps
             .name("address")
             .ok_or_else(|| anyhow::anyhow!("no address in DSN {}", s))?
@@ -134,6 +141,7 @@ impl FromStr for GoDatabaseDsn {
         Ok(GoDatabaseDsn {
             username,
             password,
+            protocol,
             address,
             database,
         })
@@ -144,19 +152,28 @@ impl TryInto<mysql::Opts> for GoDatabaseDsn {
     type Error = anyhow::Error;
 
     fn try_into(self) -> Result<mysql::Opts, Self::Error> {
-        Ok(mysql::OptsBuilder::new()
-            .user(self.username)
-            .pass(self.password)
-            .db_name(Some(self.database))
-            .tcp_port(self.address.port)
-            .ip_or_hostname(Some(self.address.name.into_mysql_string()))
-            .into())
+        if self.protocol == "unix" {
+            Ok(mysql::OptsBuilder::new()
+                .user(self.username)
+                .pass(self.password)
+                .db_name(Some(self.database))
+                .socket(Some(self.address.name.into_mysql_string()))
+                .into())
+        } else {
+            Ok(mysql::OptsBuilder::new()
+                .user(self.username)
+                .pass(self.password)
+                .db_name(Some(self.database))
+                .tcp_port(self.address.port)
+                .ip_or_hostname(Some(self.address.name.into_mysql_string()))
+                .into())
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Address, AddressName, GoDatabaseDsn};
+    use super::{Address, AddressName, GoDatabaseDsn, DEFAULT_PORT};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     use anyhow::Context;
@@ -183,7 +200,7 @@ mod tests {
             "127.0.0.1".parse::<Address>().unwrap(),
             Address {
                 name: AddressName::Address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
-                port: 3306,
+                port: DEFAULT_PORT,
             }
         );
         assert_eq!(
@@ -197,7 +214,7 @@ mod tests {
             "[::2]".parse::<Address>().unwrap(),
             Address {
                 name: AddressName::Address(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 2))),
-                port: 3306,
+                port: DEFAULT_PORT,
             }
         );
         assert_eq!(
@@ -206,6 +223,13 @@ mod tests {
                 name: AddressName::Address(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 4))),
                 port: 3307,
             }
+        );
+        assert_eq!(
+            "/var/lib/mysql.sock".parse::<Address>().unwrap(),
+            Address {
+                name: AddressName::Name("/var/lib/mysql.sock".to_string()),
+                port: DEFAULT_PORT,
+            },
         );
     }
 
@@ -221,6 +245,20 @@ mod tests {
                 port: 33606
             }
         );
+        let parsed: GoDatabaseDsn = "foo:bar@unix(/var/lib/mysql.sock)/foodb?ignored=true"
+            .parse()
+            .expect("should parse");
+        assert_eq!(
+            parsed.address,
+            Address {
+                name: AddressName::Name("/var/lib/mysql.sock".parse().unwrap()),
+                port: DEFAULT_PORT,
+            }
+        );
+        assert_eq!(
+            parsed.protocol,
+            "unix",
+        );
         assert_eq!(parsed.username.as_deref(), Some("foo"));
         assert_eq!(parsed.password.as_deref(), Some("bar"));
         assert_eq!(parsed.database, "foodb".to_string());
@@ -229,7 +267,9 @@ mod tests {
             "foo:bar@tcp([::1]:3300)/foo",
             "foo@tcp([::1])/foo",
             "tcp(127.0.0.1)/baz",
-            "usps:sekret@tcp(dblb.local.easypo.net:36060)/usps",
+            "user:sekret@tcp(hostname:36060)/dbname",
+            "user@unix(/var/lib/mysql/mysql.sock)/dbname?parseTime=true&loc=UTC&sql_mode='STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION'",
+            "user:pass@unix(/var/lib/mysql/mysql.sock)/dbname?parseTime=true&sql_mode='STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION'",
         ] {
             s.parse::<GoDatabaseDsn>()
                 .context(format!("attempting to parse {}", s))

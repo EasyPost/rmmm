@@ -16,14 +16,13 @@ pub(crate) struct MigrationRunner {
 
 #[derive(Debug)]
 pub struct ExecutedMigration {
-    pub id: usize,
+    pub id: u32,
     pub executed_at: Option<chrono::DateTime<Utc>>,
 }
 
 #[derive(Debug)]
 pub struct MigrationStep {
-    pub prev_id: Option<usize>,
-    pub id: usize,
+    pub id: u32,
     pub label: Option<String>,
     pub sql: String,
 }
@@ -31,6 +30,8 @@ pub struct MigrationStep {
 #[derive(Debug)]
 pub struct MigrationPlan {
     steps: Vec<MigrationStep>,
+
+    // determines if INSERTs or DELETEs are done on the migrations tracking table
     is_upgrade: bool,
 }
 
@@ -86,51 +87,73 @@ impl MigrationRunner {
     pub fn plan(
         &self,
         state: &MigrationState,
-        target_revision: usize,
+        target_revision: u32,
+        is_upgrade: bool,
+    ) -> anyhow::Result<MigrationPlan> {
+        if is_upgrade {
+            return self.plan_upgrade(state, target_revision)
+        } else {
+            return self.plan_downgrade(state, target_revision)
+        }
+    }
+
+    pub fn plan_upgrade(
+        &self,
+        state: &MigrationState,
+        target_revision: u32,
     ) -> anyhow::Result<MigrationPlan> {
         let highest_id = state.highest_id();
-        if target_revision > highest_id {
+        if target_revision == 0 || target_revision > highest_id {
             anyhow::bail!("Invalid target revision {}", target_revision);
         }
         let run_ids = self
             .list_run_migrations()?
             .into_iter()
             .map(|m| m.id)
-            .collect::<BTreeSet<usize>>();
-        let is_upgrade = if let Some(highest_run_id) = run_ids.iter().max() {
-            *highest_run_id <= target_revision
-        } else {
-            target_revision != 0
-        };
+            .collect::<BTreeSet<u32>>();
+
         let state_by_id = state.migrations_by_id();
-        let to_run = if is_upgrade {
-            state
+        let to_run = state
                 .all_ids()
                 .difference(&run_ids)
+                .filter(|&&i| i <= target_revision)
                 .cloned()
                 .sorted()
-                .collect::<Vec<usize>>()
-        } else {
-            run_ids
-                .iter()
-                .filter(|&&i| i > target_revision)
-                .cloned()
-                .collect::<Vec<usize>>()
-        };
-        let steps = if is_upgrade {
+                .collect::<Vec<u32>>();
+        let steps =
             to_run
                 .into_iter()
                 .map(|id| {
                     let step = state_by_id.get(&id).unwrap();
                     MigrationStep {
-                        prev_id: if id == 1 { None } else { Some(id - 1) },
                         id,
                         label: step.label.clone(),
                         sql: step.upgrade_text.clone(),
                     }
                 })
-                .collect::<Vec<_>>()
-        } else {
+                .collect::<Vec<_>>();
+        Ok(MigrationPlan { steps: steps, is_upgrade: true })
+    }
+
+    pub fn plan_downgrade(
+        &self,
+        state: &MigrationState,
+        target_revision: u32
+    ) -> anyhow::Result<MigrationPlan> {
+        let state_by_id = state.migrations_by_id();
+        let run_ids = self
+            .list_run_migrations()?
+            .into_iter()
+            .map(|m| m.id)
+            .collect::<BTreeSet<u32>>();
+
+        let to_run = run_ids
+                .iter()
+                .filter(|&&i| i > target_revision)
+                .cloned()
+                .collect::<Vec<u32>>();
+
+        let steps =
             to_run
                 .into_iter()
                 .rev()
@@ -138,7 +161,6 @@ impl MigrationRunner {
                     let step = state_by_id.get(&id).unwrap();
                     if let Some(sql) = step.downgrade_text.as_ref() {
                         Ok(MigrationStep {
-                            prev_id: if id == highest_id { None } else { Some(id + 1) },
                             id,
                             label: step.label.clone(),
                             sql: sql.clone(),
@@ -147,9 +169,8 @@ impl MigrationRunner {
                         anyhow::bail!("step {:?} is irreversible", id);
                     }
                 })
-                .collect::<anyhow::Result<Vec<_>>>()?
-        };
-        Ok(MigrationPlan { steps, is_upgrade })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok(MigrationPlan { steps: steps, is_upgrade: false })
     }
 
     fn now(&self) -> u64 {
@@ -237,6 +258,7 @@ impl MigrationRunner {
                 },
             )?;
             lines.extend(schema);
+            lines.extend(vec!["".to_string()]);
         }
         if tables.contains(&"rmmm_migrations".to_owned()) {
             lines.extend(vec!["".to_string()]);
@@ -251,6 +273,7 @@ impl MigrationRunner {
                 },
             )?);
         }
+        lines.extend(vec!["\n".to_string()]); // make sure the output ends in a newline and a blank line
         Ok(lines.join("\n"))
     }
 }
