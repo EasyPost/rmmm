@@ -19,7 +19,7 @@ impl AddressName {
         match self {
             Self::Name(s) => s,
             Self::Address(IpAddr::V4(i)) => i.to_string(),
-            Self::Address(IpAddr::V6(i)) => format!("[{}]", i),
+            Self::Address(IpAddr::V6(i)) => format!("[{i}]"),
         }
     }
 }
@@ -173,7 +173,7 @@ impl TryInto<mysql::Opts> for GoDatabaseDsn {
 
 #[cfg(test)]
 mod tests {
-    use super::{Address, AddressName, GoDatabaseDsn, DEFAULT_PORT};
+    use super::{Address, AddressName, DEFAULT_PORT, GoDatabaseDsn};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     use anyhow::Context;
@@ -255,10 +255,7 @@ mod tests {
                 port: DEFAULT_PORT,
             }
         );
-        assert_eq!(
-            parsed.protocol,
-            "unix",
-        );
+        assert_eq!(parsed.protocol, "unix",);
         assert_eq!(parsed.username.as_deref(), Some("foo"));
         assert_eq!(parsed.password.as_deref(), Some("bar"));
         assert_eq!(parsed.database, "foodb".to_string());
@@ -272,7 +269,7 @@ mod tests {
             "user:pass@unix(/var/lib/mysql/mysql.sock)/dbname?parseTime=true&sql_mode='STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION'",
         ] {
             s.parse::<GoDatabaseDsn>()
-                .context(format!("attempting to parse {}", s))
+                .context(format!("attempting to parse {s}"))
                 .expect("should parse");
         }
     }

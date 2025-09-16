@@ -46,14 +46,14 @@ impl Migration {
             .and_then(|first_line| LABEL_RE.captures(first_line))
             .map(|c| c.get(1).unwrap().as_str());
         let upgrade_text = Migration::read_sql_from_path(p)?;
-        let downgrade_p = p.with_file_name(format!("v{0}_downgrade.sql", id));
+        let downgrade_p = p.with_file_name(format!("v{id}_downgrade.sql"));
         let downgrade_text = if downgrade_p.exists() {
             Some(Migration::read_sql_from_path(&downgrade_p)?)
         } else {
             None
         };
-        debug!("Found upgrade text {:?}", upgrade_text);
-        debug!("Found downgrade text {:?}", downgrade_text);
+        debug!("Found upgrade text {upgrade_text:?}");
+        debug!("Found downgrade text {downgrade_text:?}");
         Ok(Migration {
             id,
             upgrade_text,
@@ -81,12 +81,12 @@ impl MigrationState {
         }
         let migrations = (1..)
             .map(|id| {
-                let expected_path = root_path.join("migrations").join(format!("v{0}.sql", id));
+                let expected_path = root_path.join("migrations").join(format!("v{id}.sql"));
                 if expected_path.exists() {
-                    debug!("Loading migration from {:?}", expected_path);
+                    debug!("Loading migration from {expected_path:?}");
                     Some(
                         Migration::from_path(id, &expected_path)
-                            .with_context(|| format!("Could not load migration {0}", id))
+                            .with_context(|| format!("Could not load migration {id}"))
                             .unwrap(),
                     )
                 } else {
@@ -95,7 +95,7 @@ impl MigrationState {
             })
             .while_some()
             .collect::<Vec<_>>();
-        let next_id = migrations.iter().map(|m| m.id).last().unwrap_or(0) + 1;
+        let next_id = migrations.iter().map(|m| m.id).next_back().unwrap_or(0) + 1;
         Ok(MigrationState {
             root_path,
             migrations,
@@ -113,7 +113,10 @@ impl MigrationState {
         {
             let mut f = f.as_file();
             writeln!(f, "/* rmmm migration v{0} - {1} */", self.next_id, label)?;
-            writeln!(f, "\n-- Delete this comment and put your migration here. Blank lines and comments are ignored.")?;
+            writeln!(
+                f,
+                "\n-- Delete this comment and put your migration here. Blank lines and comments are ignored."
+            )?;
             writeln!(
                 f,
                 "-- Create {0}/v{1}_downgrade.sql to make this migraiton reversible",
